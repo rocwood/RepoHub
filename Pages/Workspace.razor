@@ -1,0 +1,89 @@
+@page "/workspace"
+@namespace RepoHub
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">工作区</MudText>
+
+    <MudPaper Class="pa-4 mb-4">
+        <MudStack Row="true">
+            <MudTextField @bind-Value="workspacePath" Label="工作区路径" Variant="Variant.Outlined" />
+            <MudButton Color="Color.Primary" OnClick="LoadWorkspace">加载工作区</MudButton>
+            <MudButton Color="Color.Secondary" OnClick="OpenFolderDialog">选择目录...</MudButton>
+        </MudStack>
+    </MudPaper>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">@errorMessage</MudAlert>
+    }
+
+    @if (repositories != null && repositories.Any())
+    {
+        <MudGrid>
+            @foreach (var repo in repositories)
+            {
+                <MudItem xs="12">
+                    <MudCard Class="mb-2">
+                        <MudCardContent>
+                            <MudStack Row="true" AlignItems="AlignItems.Center">
+                                <MudText Typo="Typo.body1" Style="width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                    <b>@GetRelativePath(repo.Path)</b>
+                                </MudText>
+                                <MudStack Style="width: 120px;" Spacing="0">
+                                    <MudSelect T="string" Value="@repo.Branch" ValueChanged="@(async (string branch) => await SwitchBranch(repo, branch))"
+                                         Dense="true" AnchorOrigin="Origin.BottomCenter">
+                                        @foreach (var branch in repo.Branches)
+                                        {
+                                            <MudSelectItem Value="@branch">@branch</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </MudStack>
+                                <MudStack Class="flex-grow-1 mx-4" Spacing="0">
+                                    <MudText Typo="Typo.body2" Style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                        @repo.LastCommit.Sha.Substring(0, 7)  @repo.LastCommit.Author (@repo.LastCommit.Time.ToLocalTime().ToString("yyyy-MM-dd HH:mm"))
+                                    </MudText>
+                                    <MudText Typo="Typo.body2" Style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                        @repo.LastCommit.Message
+                                    </MudText>
+                                </MudStack>
+                                <MudStack Row="true" Style="min-width: 160px;" Spacing="5" AlignItems="AlignItems.Center" Class="d-flex justify-end">
+                                    <MudBadge Content="@repo.ChangesCount" Color="Color.Warning" Overlap="true" Visible="@(repo.ChangesCount > 0)" Origin="Origin.BottomRight">
+                                        <MudTooltip Text="提交">
+                                                    <MudIconButton Size="Size.Medium"
+                                                        Icon="@Icons.Material.Filled.Edit"
+                                                        OnClick="@(() => DoCommit(repo))"
+                                                        Disabled="@(repo.ChangesCount == 0)" />
+                                        </MudTooltip>
+                                    </MudBadge>
+                                    <MudBadge Content="@repo.BehindCount" Color="Color.Info" Overlap="true" Visible="@(repo.BehindCount > 0)" Origin="Origin.BottomRight">
+                                        <MudTooltip Text="拉取">
+                                                    <MudIconButton Size="Size.Medium"
+                                                        Icon="@Icons.Material.Filled.Download"
+                                                        OnClick="@(() => DoPull(repo))" />
+                                        </MudTooltip>
+                                    </MudBadge>
+                                    <MudBadge Content="@repo.AheadCount" Color="Color.Success" Overlap="true" Visible="@(repo.AheadCount > 0)" Origin="Origin.BottomRight">
+                                        <MudTooltip Text="推送">
+                                                            <MudIconButton Size="Size.Medium"
+                                                        Icon="@Icons.Material.Filled.Upload"
+                                                        OnClick="@(() => DoPush(repo))" />
+                                        </MudTooltip>
+                                    </MudBadge>
+                                    <MudTooltip Text="重置">
+                                                        <MudIconButton Size="Size.Medium"
+                                                    Icon="@Icons.Material.Filled.Restore"
+                                                    OnClick="@(() => DoReset(repo))" />
+                                    </MudTooltip>
+                                </MudStack>
+                            </MudStack>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+    else if (!string.IsNullOrEmpty(workspacePath))
+    {
+        <MudAlert Severity="Severity.Info">在当前工作区中未找到Git仓库</MudAlert>
+    }
+</MudContainer> 

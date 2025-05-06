@@ -1,0 +1,71 @@
+@page "/settings"
+@namespace RepoHub
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">设置</MudText>
+
+    <MudPaper Class="pa-4">
+        <MudText Typo="Typo.h6" Class="mb-4">Git 客户端配置</MudText>
+
+        <MudRadioGroup T="string" @bind-Value="@selectedClient">
+            <MudList T="GitClientConfig" Dense="true">
+                @foreach (var client in settings.GitClients)
+                {
+                    <MudListItem T="GitClientConfig" >
+                        <MudStack Row="true">
+                            <MudRadio T="string" Style="width:200px" Value="@client.Name" Color="Color.Primary">@client.Name</MudRadio>
+                            <MudTextField Style="min-width:600px" @bind-Value="client.Path" 
+                                        Variant="Variant.Outlined" 
+                                        Dense="true"
+                                        Class="flex-grow-1" />
+                        </MudStack>
+                    </MudListItem>
+                }
+            </MudList>
+        </MudRadioGroup>
+
+        <MudStack Row="true" Spacing="2" Class="mt-4">
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveSettings">保存设置</MudButton>
+            <MudButton Color="Color.Secondary" Variant="Variant.Filled" OnClick="GoBack">返回</MudButton>
+        </MudStack>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private AppSettings settings;
+    private string selectedClient;
+
+    protected override void OnInitialized()
+    {
+        settings = AppSettings.Load();
+        // 初始化选中项
+        selectedClient = settings.GitClients.FirstOrDefault(c => c.IsEnabled)?.Name;
+    }
+
+    private void SaveSettings()
+    {
+        try 
+        {
+            // 更新启用状态
+            foreach (var client in settings.GitClients)
+            {
+                client.IsEnabled = client.Name == selectedClient;
+            }
+
+            settings.Save();
+            Snackbar.Add("设置保存成功", Severity.Success);
+            GoBack();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"保存设置失败: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("workspace");
+    }
+} 
