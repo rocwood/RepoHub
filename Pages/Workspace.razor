@@ -19,11 +19,11 @@
 
     @if (repositories != null && repositories.Any())
     {
-        <MudGrid>
+        <MudGrid Spacing="1">
             @foreach (var repo in repositories)
             {
                 <MudItem xs="12">
-                    <MudCard Class="mb-2">
+                    <MudCard Class="mb-1">
                         <MudCardContent>
                             <MudStack Row="true" AlignItems="AlignItems.Center">
                                 <MudText Typo="Typo.body1" Style="width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">

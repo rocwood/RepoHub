@@ -1,5 +1,8 @@
 using LibGit2Sharp;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
+using MudBlazor;
+using Photino.NET;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -7,21 +10,24 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Timers;
-using MudBlazor;
 
 namespace RepoHub;
 
 public partial class Workspace : ComponentBase, IDisposable
 {
     [Inject] private ISnackbar Snackbar { get; set; }
-	[Inject] private NavigationManager NavigationManager { get; set; }
+    [Inject] private NavigationManager NavigationManager { get; set; }
+    [Inject] private PhotinoWindow Window { get; set; }
+    [Inject] private IJSRuntime JSRuntime { get; set; }
 
-	protected string workspacePath = "";
+    protected string workspacePath = "";
     protected string errorMessage = "";
     protected List<RepoStatus> repositories;
     protected AppSettings settings;
     private Timer refreshTimer;
     private const int REFRESH_INTERVAL = 30000; // 30秒
+    private bool isRefreshing = false;
+    private bool isDisposed = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -47,18 +53,52 @@ public partial class Workspace : ComponentBase, IDisposable
             {
                 if (!string.IsNullOrEmpty(workspacePath))
                 {
-                    await LoadWorkspace();
-                    StateHasChanged();
+                    await RefreshWorkspace();
                 }
             });
         };
         refreshTimer.Start();
+
+		// 注册窗口激活事件
+		if (Window != null)
+			Window.WindowFocusIn += OnWindowActivated;
+    }
+
+    private async void OnWindowActivated(object sender, EventArgs e)
+    {
+        if (!isDisposed && !string.IsNullOrEmpty(workspacePath))
+        {
+            await InvokeAsync(async () =>
+            {
+                await RefreshWorkspace();
+                StateHasChanged();
+            });
+        }
+    }
+
+    private async Task RefreshWorkspace()
+    {
+        if (isRefreshing) return;
+
+        try
+        {
+            isRefreshing = true;
+            await LoadWorkspace();
+        }
+        finally
+        {
+            isRefreshing = false;
+        }
     }
 
     public void Dispose()
     {
+        isDisposed = true;
         refreshTimer?.Stop();
         refreshTimer?.Dispose();
+
+        if (Window != null)
+            Window.WindowFocusIn -= OnWindowActivated;
     }
 
     protected async Task LoadWorkspace()
@@ -138,14 +178,13 @@ public partial class Workspace : ComponentBase, IDisposable
 
     protected async Task DoCommit(RepoStatus repo)
     {
-        // 实现提交更改逻辑
+        await ExecuteGitClientOperation(repo, "提交", config => config.CommitCommand);
     }
 
-    protected async Task DoPull(RepoStatus repo)
+    private async Task ExecuteGitClientOperation(RepoStatus repo, string operationType, Func<GitClientConfig, string> getCommand)
     {
         try
         {
-            // 重新加载设置以获取最新配置
             settings = AppSettings.Load();
             
             var enabledClients = settings.GitClients
@@ -172,7 +211,7 @@ public partial class Workspace : ComponentBase, IDisposable
             }
 
             var client = enabledClients.First();
-            var processArgs = string.Format(client.Config.PullCommand, repo.Path);
+            var processArgs = string.Format(getCommand(client.Config), repo.Path);
 
             var startInfo = new ProcessStartInfo
             {
@@ -182,7 +221,7 @@ public partial class Workspace : ComponentBase, IDisposable
             };
 
             Process.Start(startInfo);
-            Snackbar.Add($"已启动 {client.Config.Name} 执行拉取操作", Severity.Success);
+			Snackbar.Add($"已启动 {client.Config.Name} 执行{operationType}操作", Severity.Success);
         }
         catch (Exception ex)
         {
@@ -191,9 +230,14 @@ public partial class Workspace : ComponentBase, IDisposable
         }
     }
 
+    protected async Task DoPull(RepoStatus repo)
+    {
+        await ExecuteGitClientOperation(repo, "拉取", config => config.PullCommand);
+    }
+
     protected async Task DoPush(RepoStatus repo)
     {
-        // 实现推送更改逻辑
+        await ExecuteGitClientOperation(repo, "推送", config => config.PushCommand);
     }
 
     protected async Task DoReset(RepoStatus repo)

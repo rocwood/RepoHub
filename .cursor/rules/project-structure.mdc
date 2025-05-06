@@ -5,8 +5,9 @@ alwaysApply: true
 ---
 # RepoHub 项目结构与架构设计指南
 
-## 应用架构概述
-RepoHub 是一个使用 Photino.Blazor 的跨平台桌面应用程序，采用 Native AOT 编译。
+## 概述
+RepoHub是一个友好易用的Git多仓库管理工具。
+使用 Photino.Blazor 跨平台桌面应用技术构建，采用 Native AOT 编译。
 
 ## 技术栈
 - [Program.cs](mdc:Program.cs) - 使用 Photino.Blazor 作为桌面宿主
@@ -65,5 +66,7 @@ RepoHub 是一个使用 Photino.Blazor 的跨平台桌面应用程序，采用 N
    - 页面组件：`PageName.razor`
    - 共享组件：`ComponentName.razor`
    - 代码隐藏文件：`ComponentName.razor.cs`
+5. 其他源代码文件放在 `Sources` 目录下
+
 
 

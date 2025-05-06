@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Photino.Blazor;
@@ -15,7 +15,13 @@ namespace RepoHub
 
             appBuilder.Services
                 .AddLogging()
-                .AddMudServices();
+                .AddMudServices(config =>
+                {
+                    // 设置 Snackbar 显示时长为 1 秒，显隐过渡时长为 0.4 秒
+                    config.SnackbarConfiguration.VisibleStateDuration = 1000;
+                    config.SnackbarConfiguration.ShowTransitionDuration = 400;
+                    config.SnackbarConfiguration.HideTransitionDuration = 400;
+                });
 
             // register root component and selector
             appBuilder.RootComponents.Add<App>("app");

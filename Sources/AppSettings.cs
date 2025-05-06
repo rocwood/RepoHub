@@ -6,14 +6,6 @@ using System.Text.Json;
 
 namespace RepoHub;
 
-public class GitClientConfig
-{
-    public string Name { get; set; }
-    public string Path { get; set; }
-    public string PullCommand { get; set; }
-    public bool IsEnabled { get; set; }
-}
-
 public class AppSettings
 {
     private static readonly string ConfigPath = Path.Combine(
@@ -32,27 +24,35 @@ public class AppSettings
             Name = "TortoiseGit", 
             Path = @"C:\Program Files\TortoiseGit\bin\TortoiseGitProc.exe",
             PullCommand = "/command:pull /path:\"{0}\"",
+            PushCommand = "/command:push /path:\"{0}\"",
+            CommitCommand = "/command:commit /path:\"{0}\"",
             IsEnabled = true
         },
-		new GitClientConfig
-		{
-			Name = "SourceTree",
-			Path = @"C:\Users\%USERNAME%\AppData\Local\SourceTree\SourceTree.exe",
-			PullCommand = "-f pull \"{0}\"",
-			IsEnabled = false
-		},
-		new GitClientConfig
-		{
-			Name = "GitExtensions",
-			Path = @"C:\Program Files (x86)\GitExtensions\GitExtensions.exe",
-			PullCommand = "pull \"{0}\"",
-			IsEnabled = false
-		},
-		new GitClientConfig 
+        new GitClientConfig
+        {
+            Name = "SourceTree",
+            Path = @"C:\Users\%USERNAME%\AppData\Local\SourceTree\SourceTree.exe",
+            PullCommand = "-f pull \"{0}\"",
+            PushCommand = "-f push \"{0}\"",
+            CommitCommand = "-f commit \"{0}\"",
+            IsEnabled = false
+        },
+        new GitClientConfig
+        {
+            Name = "GitExtensions",
+            Path = @"C:\Program Files (x86)\GitExtensions\GitExtensions.exe",
+            PullCommand = "pull \"{0}\"",
+            PushCommand = "push \"{0}\"",
+            CommitCommand = "commit \"{0}\"",
+            IsEnabled = false
+        },
+        new GitClientConfig 
         { 
             Name = "Fork", 
             Path = @"C:\Users\%USERNAME%\AppData\Local\Fork\Fork.exe",
             PullCommand = "pull \"{0}\"",
+            PushCommand = "push \"{0}\"",
+            CommitCommand = "commit \"{0}\"",
             IsEnabled = false
         },
     };
