@@ -1,0 +1,26 @@
+﻿@page "/"
+
+<MudContainer Class="mt-16">
+    <MudText Typo="Typo.h2" Class="mb-8" Align="Align.Center">欢迎使用 RepoHub</MudText>
+    
+    <MudGrid>
+        <MudItem xs="12" sm="6">
+            <MudPaper Class="pa-4" Elevation="3">
+                <MudText Typo="Typo.h5" Class="mb-4">快速开始</MudText>
+                <MudText>这是一个使用 Blazor 和 MudBlazor 构建的现代化桌面应用程序。</MudText>
+                <MudButton Class="mt-4" Variant="Variant.Filled" Color="Color.Primary" Href="/counter">开始使用</MudButton>
+            </MudPaper>
+        </MudItem>
+        
+        <MudItem xs="12" sm="6">
+            <MudPaper Class="pa-4" Elevation="3">
+                <MudText Typo="Typo.h5" Class="mb-4">功能特点</MudText>
+                <MudList>
+                    <MudListItem Icon="@Icons.Material.Filled.Check">美观的 Material Design 界面</MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Check">响应式布局设计</MudListItem>
+                    <MudListItem Icon="@Icons.Material.Filled.Check">丰富的组件库支持</MudListItem>
+                </MudList>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudContainer>

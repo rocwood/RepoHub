@@ -1,0 +1,27 @@
+﻿<MudNavMenu>
+    <MudText Typo="Typo.h6" Class="px-4 py-2">导航菜单</MudText>
+    <MudDivider Class="my-2" />
+    
+    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">首页</MudNavLink>
+    <MudNavLink Href="counter" Icon="@Icons.Material.Filled.Add">计数器</MudNavLink>
+    <MudNavLink Href="fetchdata" Icon="@Icons.Material.Filled.DataUsage">数据获取</MudNavLink>
+
+    <MudDivider Class="my-2" />
+    <MudText Typo="Typo.subtitle2" Class="px-4 py-2">系统信息</MudText>
+    
+    <MudNavLink Href="https://github.com/rocwood/RepoHub" Target="_blank" 
+                Icon="@Icons.Custom.Brands.GitHub">
+        源代码
+    </MudNavLink>
+</MudNavMenu>
+
+@code {
+    private bool collapseNavMenu = true;
+
+    private string NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+}

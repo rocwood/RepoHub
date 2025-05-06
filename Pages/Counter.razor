@@ -1,0 +1,44 @@
+﻿@page "/counter"
+
+<MudContainer>
+    <MudText Typo="Typo.h3" GutterBottom="true" Class="mt-8">计数器</MudText>
+
+    <MudPaper Class="pa-8" Elevation="3">
+        <MudStack Row="true" Spacing="4" AlignItems="AlignItems.Center">
+            <MudText Typo="Typo.h5">当前计数：</MudText>
+            <MudBadge Content="@currentCount" Color="@(currentCount > 5 ? Color.Success : Color.Primary)" Overlap="true" Class="mx-4">
+                <MudIcon Icon="@Icons.Material.Filled.Numbers" Size="Size.Large" />
+            </MudBadge>
+            <MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined">
+                <MudButton OnClick="DecrementCount" StartIcon="@Icons.Material.Filled.Remove">减少</MudButton>
+                <MudButton OnClick="IncrementCount" StartIcon="@Icons.Material.Filled.Add">增加</MudButton>
+            </MudButtonGroup>
+            <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="ResetCount" StartIcon="@Icons.Material.Filled.Refresh">重置</MudButton>
+        </MudStack>
+
+        @if (currentCount >= 10)
+        {
+            <MudAlert Severity="Severity.Success" Class="mt-8">恭喜！你已经点击了 @currentCount 次！</MudAlert>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private int currentCount = 0;
+
+    private void IncrementCount()
+    {
+        currentCount++;
+    }
+
+    private void DecrementCount()
+    {
+        if (currentCount > 0)
+            currentCount--;
+    }
+
+    private void ResetCount()
+    {
+        currentCount = 0;
+    }
+}

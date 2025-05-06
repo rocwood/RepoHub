@@ -1,0 +1,43 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+	
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net8.0</TargetFramework>
+		<ApplicationIcon>favicon.ico</ApplicationIcon>
+		<IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+		<ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
+		<PublishAot>true</PublishAot>
+		<PublishTrimmed>False</PublishTrimmed>
+		<RootNamespace>RepoHub</RootNamespace>
+		<AssemblyName>RepoHub</AssemblyName>
+	</PropertyGroup>
+	
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+	  <Optimize>False</Optimize>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Photino.Blazor" Version="2.7.0" />
+		<PackageReference Include="MudBlazor" Version="6.17.0" />
+	</ItemGroup>
+
+	<ItemGroup Condition="$(RuntimeIdentifier.StartsWith('win'))">
+		<RdXmlFile Include="rd.xml" />
+		<RdXmlFile Include="Microsoft.AspNetCore.Components.Web.rd.xml" />
+		<IlcArg Include="--nometadatablocking" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Content Update="wwwroot\**">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Update="favicon.ico">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </None>
+	</ItemGroup>
+
+</Project>

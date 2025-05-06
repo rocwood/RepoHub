@@ -1,0 +1,63 @@
+﻿@page "/fetchdata"
+@inject HttpClient Http
+
+<MudContainer Class="mt-16">
+    <MudText Typo="Typo.h3" GutterBottom="true">天气预报</MudText>
+    <MudText Class="mb-8">此组件演示从服务器获取数据。</MudText>
+
+    @if (forecasts == null)
+    {
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+    }
+    else
+    {
+        <MudPaper Elevation="3" Class="pa-4">
+            <MudTable Items="@forecasts" Hover="true" Breakpoint="Breakpoint.Sm" Loading="@(forecasts == null)">
+                <HeaderContent>
+                    <MudTh><MudTableSortLabel SortBy="new Func<WeatherForecast, object>(x => x.Date)">日期</MudTableSortLabel></MudTh>
+                    <MudTh><MudTableSortLabel SortBy="new Func<WeatherForecast, object>(x => x.TemperatureC)">温度 (°C)</MudTableSortLabel></MudTh>
+                    <MudTh><MudTableSortLabel SortBy="new Func<WeatherForecast, object>(x => x.TemperatureF)">温度 (°F)</MudTableSortLabel></MudTh>
+                    <MudTh><MudTableSortLabel SortBy="new Func<WeatherForecast, object>(x => x.Summary)">天气概况</MudTableSortLabel></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="日期">@context.Date.ToShortDateString()</MudTd>
+                    <MudTd DataLabel="温度 (°C)">
+                        <MudChip Color="@(context.TemperatureC > 25 ? Color.Error : context.TemperatureC < 10 ? Color.Info : Color.Success)" 
+                                Size="Size.Small">
+                            @context.TemperatureC
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="温度 (°F)">@context.TemperatureF</MudTd>
+                    <MudTd DataLabel="天气概况">
+                        <MudHighlighter Text="@context.Summary" HighlightedText="@searchString" />
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager />
+                </PagerContent>
+            </MudTable>
+
+            <MudTextField @bind-Value="searchString" Placeholder="搜索..." Adornment="Adornment.Start"
+                         AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-4">
+            </MudTextField>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    private WeatherForecast[] forecasts;
+    private string searchString = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        forecasts = await Http.GetFromJsonAsync<WeatherForecast[]>("sample-data/weather.json");
+    }
+
+    public class WeatherForecast
+    {
+        public DateTime Date { get; set; }
+        public int TemperatureC { get; set; }
+        public string Summary { get; set; }
+        public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+    }
+}
