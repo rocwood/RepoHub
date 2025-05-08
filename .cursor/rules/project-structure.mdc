@@ -12,7 +12,7 @@ RepoHub是一个友好易用的Git多仓库管理工具。
 ## 技术栈
 - [Program.cs](mdc:Program.cs) - 使用 Photino.Blazor 作为桌面宿主
 - Blazor 用于 UI 渲染
-- [MudBlazor](mdc:https:/mudblazor.com) 作为 UI 组件库
+- [MudBlazor](mdc:https:/mudblazor.com) 作为 UI 组件库。需要关注 MudBlazor 8.x 的破坏性变更
 
 ## 核心文件
 - [Program.cs](mdc:Program.cs) - 应用程序入口点和主要配置
@@ -67,6 +67,7 @@ RepoHub是一个友好易用的Git多仓库管理工具。
    - 共享组件：`ComponentName.razor`
    - 代码隐藏文件：`ComponentName.razor.cs`
 5. 其他源代码文件放在 `Sources` 目录下
+
 
 
 

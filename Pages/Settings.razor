@@ -13,7 +13,7 @@
             <MudList T="GitClientConfig" Dense="true">
                 @foreach (var client in settings.GitClients)
                 {
-                    <MudListItem T="GitClientConfig" >
+                    <MudListItem T="GitClientConfig">
                         <MudStack Row="true">
                             <MudRadio T="string" Style="width:200px" Value="@client.Name" Color="Color.Primary">@client.Name</MudRadio>
                             <MudTextField Style="min-width:600px" @bind-Value="client.Path" 
@@ -23,6 +23,17 @@
                         </MudStack>
                     </MudListItem>
                 }
+
+                <MudListItem T="GitClientConfig">
+                    <MudStack Row="true">
+                        <MudText T="string" Style="width:200px" Color="Color.Secondary" >Git 命令行配置</MudText>
+                        <MudTextField Style="min-width:600px" @bind-Value="settings.GitExecutablePath" 
+                                    Variant="Variant.Outlined" 
+                                    Dense="true"
+                                    Class="flex-grow-1" 
+                                    HelperText="默认为 'git'，如需指定完整路径请输入（如：C:\Program Files\Git\bin\git.exe）"/>
+                    </MudStack>
+                </MudListItem>
             </MudList>
         </MudRadioGroup>
 

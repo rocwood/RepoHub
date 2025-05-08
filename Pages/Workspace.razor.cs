@@ -19,6 +19,7 @@ public partial class Workspace : ComponentBase, IDisposable
     [Inject] private NavigationManager NavigationManager { get; set; }
     [Inject] private PhotinoWindow Window { get; set; }
     [Inject] private IJSRuntime JSRuntime { get; set; }
+    [Inject] private IDialogService DialogService { get; set; }
 
     protected string workspacePath = "";
     protected string errorMessage = "";
@@ -59,9 +60,9 @@ public partial class Workspace : ComponentBase, IDisposable
         };
         refreshTimer.Start();
 
-		// 注册窗口激活事件
-		if (Window != null)
-			Window.WindowFocusIn += OnWindowActivated;
+        // 注册窗口激活事件
+        if (Window != null)
+            Window.WindowFocusIn += OnWindowActivated;
     }
 
     private async void OnWindowActivated(object sender, EventArgs e)
@@ -227,14 +228,14 @@ public partial class Workspace : ComponentBase, IDisposable
             };
 
             Process.Start(startInfo);
-			Snackbar.Add($"已启动 {client.Config.Name} 执行{operationType}操作", Severity.Success);
+            Snackbar.Add($"已启动 {client.Config.Name} 执行{operationType}操作", Severity.Success);
         }
         catch (Exception ex)
         {
             errorMessage = $"启动Git客户端时出错: {ex.Message}";
             Snackbar.Add(errorMessage, Severity.Error);
         }
-    }
+	}
 
     protected async Task DoPull(RepoStatus repo)
     {
@@ -248,7 +249,80 @@ public partial class Workspace : ComponentBase, IDisposable
 
     protected async Task DoReset(RepoStatus repo)
     {
-        // 实现重置更改逻辑
+        var options = new DialogOptions { CloseOnEscapeKey = true, CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var parameters = new DialogParameters
+        {
+            { "Title", "重置确认" },
+            { "ContentText", "请选择重置类型：\n\n" +
+                "【软重置】\n-  保留所有修改。\n-  已提交的更改保持在暂存区\n\n" +
+                "【硬重置】\n-  丢弃所有未提交修改。\n-  将工作区和暂存区恢复到最新提交状态。\n-  此操作不可撤销，请谨慎使用！" },
+            { "AdditionalInfo", $"仓库：{GetRelativePath(repo.Path)}  分支：{repo.Branch}\n" },
+            { "Color", Color.Warning },
+            { "Severity", Severity.Warning },
+            { "Actions", new List<DialogAction>
+                {
+                    new()
+                    {
+                        Text = "软重置",
+                        Value = GitResetType.Soft,
+                        Color = Color.Warning,
+                        Variant = Variant.Filled
+                    },
+                    new()
+                    {
+                        Text = "硬重置(危险)",
+                        Value = GitResetType.Hard,
+                        Color = Color.Error,
+                        Variant = Variant.Filled
+                    },
+                }
+            }
+        };
+
+        var dialog = await DialogService.ShowAsync<MessageBox>("重置确认", parameters, options);
+        var result = await dialog.Result;
+        if (result.Canceled)
+            return;
+
+        try
+        {
+            settings = AppSettings.Load();
+            var resetTypeArg = ((GitResetType)result.Data == GitResetType.Soft) ? "--soft" : "--hard";
+            var resetTarget = "HEAD";
+            
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = settings.GitExecutablePath,
+                Arguments = $"-C \"{repo.Path}\" reset {resetTypeArg} {resetTarget}",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+
+            var process = Process.Start(startInfo);
+            var output = await process.StandardOutput.ReadToEndAsync();
+            var error = await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+
+            if (process.ExitCode == 0)
+            {
+                var message = ((GitResetType)result.Data == GitResetType.Soft) ? 
+                    "已软重置，工作区的修改已保留" : 
+                    "已硬重置，所有修改已丢弃";
+                Snackbar.Add(message, Severity.Success);
+                await RefreshWorkspace();
+            }
+            else
+            {
+                Snackbar.Add($"重置失败: {error}", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"执行重置命令时出错: {ex.Message}";
+            Snackbar.Add(errorMessage, Severity.Error);
+        }
     }
 
     protected async Task<string> LoadLastWorkspacePath()

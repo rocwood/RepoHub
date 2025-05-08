@@ -24,6 +24,9 @@ public class AppSettings
     // 是否在分支列表中显示远程分支
     public bool ShowRemoteBranches { get; set; } = false;
     
+    // Git命令行路径
+    public string GitExecutablePath { get; set; } = "git";
+    
     // Git客户端配置
     public List<GitClientConfig> GitClients { get; set; } = new()
     {
@@ -43,15 +46,6 @@ public class AppSettings
             PullCommand = "-f pull \"{0}\"",
             PushCommand = "-f push \"{0}\"",
             CommitCommand = "-f commit \"{0}\"",
-            IsEnabled = false
-        },
-        new GitClientConfig
-        {
-            Name = "GitExtensions",
-            Path = @"C:\Program Files (x86)\GitExtensions\GitExtensions.exe",
-            PullCommand = "pull \"{0}\"",
-            PushCommand = "push \"{0}\"",
-            CommitCommand = "commit \"{0}\"",
             IsEnabled = false
         },
         new GitClientConfig 

@@ -20,4 +20,10 @@ public class CommitInfo
     public string Message { get; set; }
     public string Author { get; set; }
     public DateTimeOffset Time { get; set; }
-} 
+}
+
+public enum GitResetType
+{
+	Soft = 1,    // 软重置：保留工作区和暂存区的修改
+	Hard = 2,    // 硬重置：丢弃所有修改，包括工作区和暂存区
+}
