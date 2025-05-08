@@ -3,8 +3,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace RepoHub;
+
+[JsonSourceGenerationOptions(WriteIndented = true)]
+[JsonSerializable(typeof(AppSettings))]
+internal partial class AppSettingsContext : JsonSerializerContext {}
 
 public class AppSettings
 {
@@ -15,6 +20,9 @@ public class AppSettings
     );
 
     public string LastWorkspacePath { get; set; } = "";
+    
+    // 是否在分支列表中显示远程分支
+    public bool ShowRemoteBranches { get; set; } = false;
     
     // Git客户端配置
     public List<GitClientConfig> GitClients { get; set; } = new()
@@ -70,7 +78,7 @@ public class AppSettings
             if (File.Exists(ConfigPath))
             {
                 var json = File.ReadAllText(ConfigPath);
-                var settings = JsonSerializer.Deserialize<AppSettings>(json);
+                var settings = JsonSerializer.Deserialize(json, AppSettingsContext.Default.AppSettings);
                 
                 // 确保默认客户端列表完整
                 foreach (var defaultClient in new AppSettings().GitClients)
@@ -95,7 +103,7 @@ public class AppSettings
     {
         try
         {
-            var json = JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true });
+            var json = JsonSerializer.Serialize(this, AppSettingsContext.Default.AppSettings);
             File.WriteAllText(ConfigPath, json);
         }
         catch

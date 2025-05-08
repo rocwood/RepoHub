@@ -140,11 +140,17 @@ public partial class Workspace : ComponentBase, IDisposable
                     var branch = repo.Head;
                     var tracking = branch.TrackingDetails;
 
+                    var branches = repo.Branches
+                        .Where(b => !b.IsRemote || settings.ShowRemoteBranches) // 根据设置显示远程分支
+                        .Where(b => b.FriendlyName != "HEAD") // 排除 HEAD 分支
+                        .Select(b => b.FriendlyName)
+                        .ToList();
+
                     repositories.Add(new RepoStatus
                     {
                         Path = dir,
                         Branch = branch.FriendlyName,
-                        Branches = repo.Branches.Select(b => b.FriendlyName).ToList(),
+                        Branches = branches,
                         LastCommit = new CommitInfo
                         {
                             Sha = branch.Tip.Sha,
@@ -262,10 +268,28 @@ public partial class Workspace : ComponentBase, IDisposable
         {
             using var repository = new Repository(repo.Path);
             var branch = repository.Branches[newBranch];
+            
+            // 如果是远程分支，创建本地跟踪分支
+            if (branch != null && branch.IsRemote)
+            {
+                var localBranchName = branch.FriendlyName.Replace(branch.RemoteName + "/", "");
+                var localBranch = repository.Branches[localBranchName];
+                
+                if (localBranch == null)
+                {
+                    // 创建本地跟踪分支
+                    localBranch = repository.CreateBranch(localBranchName, branch.Tip);
+                    repository.Branches.Update(localBranch, 
+                        b => b.TrackedBranch = branch.CanonicalName);
+                }
+                
+                branch = localBranch;
+            }
+
             if (branch != null)
             {
                 Commands.Checkout(repository, branch);
-                repo.Branch = newBranch;
+                repo.Branch = branch.FriendlyName;
                 
                 // 更新状态
                 var status = repository.RetrieveStatus();
@@ -273,11 +297,14 @@ public partial class Workspace : ComponentBase, IDisposable
                 repo.ChangesCount = status.Added.Count() + status.Modified.Count() + status.Removed.Count();
                 repo.AheadCount = tracking?.AheadBy ?? 0;
                 repo.BehindCount = tracking?.BehindBy ?? 0;
+
+                Snackbar.Add($"已切换到分支: {branch.FriendlyName}", Severity.Success);
             }
         }
         catch (Exception ex)
         {
             errorMessage = $"切换分支时出错: {ex.Message}";
+            Snackbar.Add(errorMessage, Severity.Error);
         }
     }
 } 
