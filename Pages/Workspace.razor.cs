@@ -43,12 +43,25 @@ public partial class Workspace : ComponentBase, IDisposable
     protected override async Task OnInitializedAsync()
     {
         settings = AppSettings.Load();
-        workspacePath = settings.LastWorkspacePath;
-        
-        if (string.IsNullOrEmpty(workspacePath))
+
+        // 如果工作区路径列表为空，添加上次使用的路径
+        if (settings.WorkspacePaths.Count == 0 && !string.IsNullOrEmpty(settings.LastWorkspacePath))
         {
-            // 如果没有保存的路径，使用当前目录
-            workspacePath = Environment.CurrentDirectory;
+            settings.WorkspacePaths.Add(settings.LastWorkspacePath);
+            settings.Save();
+        }
+
+        // 如果列表仍为空，使用当前目录
+        if (settings.WorkspacePaths.Count == 0)
+        {
+            settings.WorkspacePaths.Add(Environment.CurrentDirectory);
+            settings.Save();
+        }
+
+        workspacePath = settings.LastWorkspacePath;
+        if (string.IsNullOrEmpty(workspacePath) && settings.WorkspacePaths.Any())
+        {
+            workspacePath = settings.WorkspacePaths[0];
         }
 
         if (!string.IsNullOrEmpty(workspacePath))
@@ -56,10 +69,8 @@ public partial class Workspace : ComponentBase, IDisposable
 
         // 初始化定时器
         refreshTimer = new Timer(REFRESH_INTERVAL);
-        refreshTimer.Elapsed += async (sender, e) =>
-        {
-            await InvokeAsync(async () =>
-            {
+        refreshTimer.Elapsed += async (sender, e) => {
+            await InvokeAsync(async () => {
                 if (!string.IsNullOrEmpty(workspacePath))
                     await RefreshWorkspace(true);
             });
@@ -75,8 +86,7 @@ public partial class Workspace : ComponentBase, IDisposable
     {
         if (!isDisposed && !string.IsNullOrEmpty(workspacePath))
         {
-            await InvokeAsync(async () =>
-            {
+            await InvokeAsync(async () => {
                 await RefreshWorkspace(false);
                 StateHasChanged();
             });
@@ -116,16 +126,21 @@ public partial class Workspace : ComponentBase, IDisposable
             if (string.IsNullOrEmpty(workspacePath) || !Directory.Exists(workspacePath))
             {
                 errorMessage = "请指定有效的工作区路径";
+                repositories = new List<RepoStatus>();  // 清空列表
                 return;
             }
 
-            repositories = new List<RepoStatus>();
             await ScanRepositories(workspacePath, fetchRemote);
             await SaveWorkspacePath(workspacePath);
         }
         catch (Exception ex)
         {
             errorMessage = $"加载工作区时出错: {ex.Message}";
+            repositories = new List<RepoStatus>();  // 发生错误时也清空列表
+        }
+        finally
+        {
+            StateHasChanged();  // 确保UI更新
         }
     }
 
@@ -133,6 +148,9 @@ public partial class Workspace : ComponentBase, IDisposable
     {
         try
         {
+            // 在开始加载之前清空列表
+            repositories = new List<RepoStatus>();
+
             // 只扫描顶层目录
             foreach (var dir in Directory.GetDirectories(path))
             {
@@ -142,14 +160,14 @@ public partial class Workspace : ComponentBase, IDisposable
 
                 if (Repository.IsValid(dir))
                 {
-					var repo = new RepoStatus { Path = dir };
-					repositories.Add(repo);
+                    var repo = new RepoStatus { Path = dir };
+                    repositories.Add(repo);
 
-					using (var gitRepo = new Repository(dir))
-						UpdateRepositoryStatus(repo, gitRepo);
+                    using (var gitRepo = new Repository(dir))
+                        UpdateRepositoryStatus(repo, gitRepo);
 
-					if (fetchRemote)
-						_ = FetchRepository(repo);
+                    if (fetchRemote)
+                        _ = FetchRepository(repo);
                 }
             }
         }
@@ -176,8 +194,7 @@ public partial class Workspace : ComponentBase, IDisposable
         try
         {
             // 尝试从 git config 获取凭据
-            var startInfo = new ProcessStartInfo
-            {
+            var startInfo = new ProcessStartInfo {
                 FileName = "git",
                 Arguments = "config --get credential.helper",
                 UseShellExecute = false,
@@ -192,8 +209,7 @@ public partial class Workspace : ComponentBase, IDisposable
             if (output?.Contains("manager") == true)
             {
                 // 使用 git credential manager 获取凭据
-                startInfo = new ProcessStartInfo
-                {
+                startInfo = new ProcessStartInfo {
                     FileName = "git",
                     Arguments = $"credential fill",
                     UseShellExecute = false,
@@ -221,15 +237,13 @@ public partial class Workspace : ComponentBase, IDisposable
 
                     if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
                     {
-                        var creds = new UsernamePasswordCredentials
-                        {
+                        var creds = new UsernamePasswordCredentials {
                             Username = username,
                             Password = password
                         };
 
                         // 添加到缓存，成功获取的凭据永不过期
-                        _credentialsCache.TryAdd(cacheKey, new CachedCredentials
-                        {
+                        _credentialsCache.TryAdd(cacheKey, new CachedCredentials {
                             Credentials = creds,
                             ExpiresAt = null  // 永不过期
                         });
@@ -245,10 +259,9 @@ public partial class Workspace : ComponentBase, IDisposable
 
         // 如果出现任何错误，返回默认凭据，并设置过期时间
         var defaultCreds = new DefaultCredentials();
-        
+
         // 缓存默认凭据，30分钟后过期
-        _credentialsCache.TryAdd(cacheKey, new CachedCredentials
-        {
+        _credentialsCache.TryAdd(cacheKey, new CachedCredentials {
             Credentials = defaultCreds,
             ExpiresAt = DateTime.Now.AddMinutes(CREDENTIALS_CACHE_MINUTES)
         });
@@ -258,17 +271,16 @@ public partial class Workspace : ComponentBase, IDisposable
 
     private async Task FetchRepository(RepoStatus repo)
     {
-        if (repo == null) 
-			return;
+        if (repo == null)
+            return;
 
-		try
+        try
         {
             repo.IsFetching = true;
             StateHasChanged();
 
-			// 后台运行获取远程状态
-            await Task.Run(async () =>
-            {
+            // 后台运行获取远程状态
+            await Task.Run(async () => {
                 try
                 {
                     using var gitRepo = new Repository(repo.Path);
@@ -277,8 +289,7 @@ public partial class Workspace : ComponentBase, IDisposable
                         try
                         {
                             var refSpecs = remote.FetchRefSpecs.Select(x => x.Specification).ToList();
-                            var fetchOptions = new FetchOptions 
-                            { 
+                            var fetchOptions = new FetchOptions {
                                 Prune = false,
                                 TagFetchMode = TagFetchMode.Auto,
                                 CredentialsProvider = GetCredentialsProvider,
@@ -288,7 +299,7 @@ public partial class Workspace : ComponentBase, IDisposable
                         }
                         catch (Exception ex)
                         {
-                            await InvokeAsync(() => 
+                            await InvokeAsync(() =>
                                 Snackbar.Add($"仓库 {Path.GetFileName(repo.Path)} 从远程 {remote.Name} fetch 时出错: {ex.Message}", Severity.Warning));
                         }
                     }
@@ -297,7 +308,7 @@ public partial class Workspace : ComponentBase, IDisposable
                 }
                 catch (Exception ex)
                 {
-                    await InvokeAsync(() => 
+                    await InvokeAsync(() =>
                         Snackbar.Add($"仓库 {Path.GetFileName(repo.Path)} fetch 时出错: {ex.Message}", Severity.Warning));
                 }
             });
@@ -322,8 +333,7 @@ public partial class Workspace : ComponentBase, IDisposable
             .Select(b => b.FriendlyName)
             .ToList();
 
-        repo.LastCommit = new CommitInfo
-        {
+        repo.LastCommit = new CommitInfo {
             Sha = branch.Tip.Sha,
             Message = branch.Tip.Message,
             Author = branch.Tip.Author.Name,
@@ -342,9 +352,78 @@ public partial class Workspace : ComponentBase, IDisposable
 
     protected async Task OpenFolderDialog()
     {
-        // 这里需要实现文件夹选择对话框
-        // 可以使用JS互操作或其他方式实现
+        try
+        {
+            var folders = await Window.ShowOpenFolderAsync("选择工作区路径");
+            if (folders == null || folders.Length == 0)
+                return;
+
+            var folderPath = folders[0];
+
+            if (!string.IsNullOrEmpty(folderPath) && Directory.Exists(folderPath))
+            {
+                if (!settings.WorkspacePaths.Contains(folderPath))
+                {
+                    settings.WorkspacePaths.Add(folderPath);
+                    settings.LastWorkspacePath = folderPath;
+                    settings.Save();
+
+                    workspacePath = folderPath;
+                    await LoadWorkspace(true);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"选择目录时出错: {ex.Message}";
+            Snackbar.Add(errorMessage, Severity.Error);
+        }
     }
+
+    protected async Task DeleteCurrentWorkspace()
+    {
+        if (settings.WorkspacePaths.Count <= 1)
+        {
+            Snackbar.Add("必须保留至少一个工作区路径", Severity.Warning);
+            return;
+        }
+
+        var options = new DialogOptions { CloseOnEscapeKey = true, CloseButton = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+        var parameters = new DialogParameters
+        {
+            { "Title", "移除工作区" },
+            { "ContentText", "确定要从列表中移除此工作区吗？\n这不会删除磁盘上的文件。" },
+            { "AdditionalInfo", $"工作区路径：{workspacePath}" },
+            { "Color", Color.Warning },
+			{ "Actions", new List<DialogAction>
+				{
+					new()
+					{
+						Text = "移除",
+						Value = 1,
+						Color = Color.Warning,
+						Variant = Variant.Filled
+					},
+				}
+			}
+		};
+
+        var dialog = await DialogService.ShowAsync<MessageBox>("移除确认", parameters, options);
+        var result = await dialog.Result;
+		if (result.Canceled)
+			return;
+
+        settings.WorkspacePaths.Remove(workspacePath);
+
+        // 切换到列表中的第一个工作区
+        workspacePath = settings.WorkspacePaths[0];
+        settings.LastWorkspacePath = workspacePath;
+        settings.Save();
+
+        await LoadWorkspace(true);
+        Snackbar.Add("工作区已从列表中移除", Severity.Success);
+    }
+
 
     protected async Task DoCommit(RepoStatus repo)
     {
@@ -356,16 +435,16 @@ public partial class Workspace : ComponentBase, IDisposable
         try
         {
             settings = AppSettings.Load();
-            
+
             var enabledClients = settings.GitClients
                 .Where(c => c.IsEnabled)
-                .Select(c => new { 
-                    Config = c, 
+                .Select(c => new {
+                    Config = c,
                     ActualPath = c.Path.Replace("%USERNAME%", Environment.UserName)
                 })
                 .Where(x => File.Exists(x.ActualPath))
                 .ToList();
-            
+
             if (!enabledClients.Any())
             {
                 if (!settings.GitClients.Any(c => c.IsEnabled))
@@ -383,8 +462,7 @@ public partial class Workspace : ComponentBase, IDisposable
             var client = enabledClients.First();
             var processArgs = string.Format(getCommand(client.Config), repo.Path);
 
-            var startInfo = new ProcessStartInfo
-            {
+            var startInfo = new ProcessStartInfo {
                 FileName = client.ActualPath,
                 Arguments = processArgs,
                 UseShellExecute = true
@@ -451,17 +529,17 @@ public partial class Workspace : ComponentBase, IDisposable
         {
             using var repository = new Repository(repo.Path);
             var resetType = (GitResetType)result.Data == GitResetType.Soft ? ResetMode.Soft : ResetMode.Hard;
-            
+
             // 获取当前分支的最新提交
             var targetCommit = repository.Head.Tip;
-            
+
             // 执行重置
             repository.Reset(resetType, targetCommit);
 
-            var message = resetType == ResetMode.Soft ? 
-                "已软重置，工作区的修改已保留" : 
+            var message = resetType == ResetMode.Soft ?
+                "已软重置，工作区的修改已保留" :
                 "已硬重置，所有修改已丢弃";
-            
+
             Snackbar.Add(message, Severity.Success);
             await RefreshWorkspace(false);
         }
@@ -489,21 +567,21 @@ public partial class Workspace : ComponentBase, IDisposable
         {
             using var repository = new Repository(repo.Path);
             var branch = repository.Branches[newBranch];
-            
+
             // 如果是远程分支，创建本地跟踪分支
             if (branch != null && branch.IsRemote)
             {
                 var localBranchName = branch.FriendlyName.Replace(branch.RemoteName + "/", "");
                 var localBranch = repository.Branches[localBranchName];
-                
+
                 if (localBranch == null)
                 {
                     // 创建本地跟踪分支
                     localBranch = repository.CreateBranch(localBranchName, branch.Tip);
-                    repository.Branches.Update(localBranch, 
+                    repository.Branches.Update(localBranch,
                         b => b.TrackedBranch = branch.CanonicalName);
                 }
-                
+
                 branch = localBranch;
             }
 
@@ -511,7 +589,7 @@ public partial class Workspace : ComponentBase, IDisposable
             {
                 Commands.Checkout(repository, branch);
                 repo.Branch = branch.FriendlyName;
-                
+
                 // 更新状态
                 var status = repository.RetrieveStatus();
                 var tracking = branch.TrackingDetails;
@@ -528,4 +606,20 @@ public partial class Workspace : ComponentBase, IDisposable
             Snackbar.Add(errorMessage, Severity.Error);
         }
     }
-} 
+
+    protected async Task OnWorkspacePathChanged(string newPath)
+    {
+        if (workspacePath != newPath)
+        {
+            workspacePath = newPath;
+            settings.LastWorkspacePath = newPath;
+            settings.Save();
+
+            // 确保在UI线程上执行加载
+            await InvokeAsync(async () => {
+                await LoadWorkspace(true);
+                StateHasChanged();
+            });
+        }
+    }
+}

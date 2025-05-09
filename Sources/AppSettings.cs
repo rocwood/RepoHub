@@ -21,6 +21,9 @@ public class AppSettings
 
     public string LastWorkspacePath { get; set; } = "";
     
+    // 工作区路径列表
+    public List<string> WorkspacePaths { get; set; } = new();
+    
     // 是否在分支列表中显示远程分支
     public bool ShowRemoteBranches { get; set; } = false;
     
