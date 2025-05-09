@@ -12,6 +12,7 @@ public class RepoStatus
     public int ChangesCount { get; set; }
     public int AheadCount { get; set; }
     public int BehindCount { get; set; }
+    public bool IsFetching { get; set; }
 }
 
 public class CommitInfo

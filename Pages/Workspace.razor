@@ -7,7 +7,7 @@
     <MudPaper Class="pa-4 mb-4">
         <MudStack Row="true">
             <MudTextField @bind-Value="workspacePath" Label="工作区路径" Variant="Variant.Outlined" />
-            <MudButton Color="Color.Primary" OnClick="LoadWorkspace">加载工作区</MudButton>
+            <MudButton Color="Color.Primary" OnClick="@(() => LoadWorkspace(true))">加载工作区</MudButton>
             <MudButton Color="Color.Secondary" OnClick="OpenFolderDialog">选择目录...</MudButton>
         </MudStack>
     </MudPaper>

@@ -26,7 +26,7 @@
 
                 <MudListItem T="GitClientConfig">
                     <MudStack Row="true">
-                        <MudText T="string" Style="width:200px" Color="Color.Secondary" >Git 命令行配置</MudText>
+                        <MudText T="string" Style="width:200px; display:flex; align-items:center" Color="Color.Secondary" >Git 命令行配置</MudText>
                         <MudTextField Style="min-width:600px" @bind-Value="settings.GitExecutablePath" 
                                     Variant="Variant.Outlined" 
                                     Dense="true"

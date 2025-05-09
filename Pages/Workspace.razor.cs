@@ -4,6 +4,7 @@ using Microsoft.JSInterop;
 using MudBlazor;
 using Photino.NET;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -26,9 +27,18 @@ public partial class Workspace : ComponentBase, IDisposable
     protected List<RepoStatus> repositories;
     protected AppSettings settings;
     private Timer refreshTimer;
-    private const int REFRESH_INTERVAL = 30000; // 30秒
+    private const int REFRESH_INTERVAL = 60000; // 60秒
     private bool isRefreshing = false;
     private bool isDisposed = false;
+
+    private class CachedCredentials
+    {
+        public Credentials Credentials { get; set; }
+        public DateTime? ExpiresAt { get; set; }  // null 表示永不过期
+    }
+
+    private static readonly ConcurrentDictionary<string, CachedCredentials> _credentialsCache = new();
+    private const int CREDENTIALS_CACHE_MINUTES = 30;
 
     protected override async Task OnInitializedAsync()
     {
@@ -42,9 +52,7 @@ public partial class Workspace : ComponentBase, IDisposable
         }
 
         if (!string.IsNullOrEmpty(workspacePath))
-        {
-            await LoadWorkspace();
-        }
+            await LoadWorkspace(true);
 
         // 初始化定时器
         refreshTimer = new Timer(REFRESH_INTERVAL);
@@ -53,9 +61,7 @@ public partial class Workspace : ComponentBase, IDisposable
             await InvokeAsync(async () =>
             {
                 if (!string.IsNullOrEmpty(workspacePath))
-                {
-                    await RefreshWorkspace();
-                }
+                    await RefreshWorkspace(true);
             });
         };
         refreshTimer.Start();
@@ -71,20 +77,20 @@ public partial class Workspace : ComponentBase, IDisposable
         {
             await InvokeAsync(async () =>
             {
-                await RefreshWorkspace();
+                await RefreshWorkspace(false);
                 StateHasChanged();
             });
         }
     }
 
-    private async Task RefreshWorkspace()
+    private async Task RefreshWorkspace(bool fetchRemote)
     {
         if (isRefreshing) return;
 
         try
         {
             isRefreshing = true;
-            await LoadWorkspace();
+            await LoadWorkspace(fetchRemote);
         }
         finally
         {
@@ -102,7 +108,7 @@ public partial class Workspace : ComponentBase, IDisposable
             Window.WindowFocusIn -= OnWindowActivated;
     }
 
-    protected async Task LoadWorkspace()
+    protected async Task LoadWorkspace(bool fetchRemote)
     {
         try
         {
@@ -114,7 +120,7 @@ public partial class Workspace : ComponentBase, IDisposable
             }
 
             repositories = new List<RepoStatus>();
-            await ScanRepositories(workspacePath);
+            await ScanRepositories(workspacePath, fetchRemote);
             await SaveWorkspacePath(workspacePath);
         }
         catch (Exception ex)
@@ -123,7 +129,7 @@ public partial class Workspace : ComponentBase, IDisposable
         }
     }
 
-    protected async Task ScanRepositories(string path)
+    protected async Task ScanRepositories(string path, bool fetchRemote)
     {
         try
         {
@@ -136,33 +142,14 @@ public partial class Workspace : ComponentBase, IDisposable
 
                 if (Repository.IsValid(dir))
                 {
-                    using var repo = new Repository(dir);
-                    var status = repo.RetrieveStatus();
-                    var branch = repo.Head;
-                    var tracking = branch.TrackingDetails;
+					var repo = new RepoStatus { Path = dir };
+					repositories.Add(repo);
 
-                    var branches = repo.Branches
-                        .Where(b => !b.IsRemote || settings.ShowRemoteBranches) // 根据设置显示远程分支
-                        .Where(b => b.FriendlyName != "HEAD") // 排除 HEAD 分支
-                        .Select(b => b.FriendlyName)
-                        .ToList();
+					using (var gitRepo = new Repository(dir))
+						UpdateRepositoryStatus(repo, gitRepo);
 
-                    repositories.Add(new RepoStatus
-                    {
-                        Path = dir,
-                        Branch = branch.FriendlyName,
-                        Branches = branches,
-                        LastCommit = new CommitInfo
-                        {
-                            Sha = branch.Tip.Sha,
-                            Message = branch.Tip.Message,
-                            Author = branch.Tip.Author.Name,
-                            Time = branch.Tip.Author.When
-                        },
-                        ChangesCount = status.Added.Count() + status.Modified.Count() + status.Removed.Count(),
-                        AheadCount = tracking?.AheadBy ?? 0,
-                        BehindCount = tracking?.BehindBy ?? 0
-                    });
+					if (fetchRemote)
+						_ = FetchRepository(repo);
                 }
             }
         }
@@ -170,6 +157,182 @@ public partial class Workspace : ComponentBase, IDisposable
         {
             errorMessage = $"扫描仓库时出错: {ex.Message}";
         }
+    }
+
+    private static Credentials GetCredentialsProvider(string url, string usernameFromUrl, SupportedCredentialTypes types)
+    {
+        var cacheKey = $"{url}:{usernameFromUrl}";
+
+        // 检查缓存
+        if (_credentialsCache.TryGetValue(cacheKey, out var cached))
+        {
+            if (!cached.ExpiresAt.HasValue || DateTime.Now < cached.ExpiresAt.Value)
+                return cached.Credentials;
+
+            // 过期则移除
+            _credentialsCache.TryRemove(cacheKey, out _);
+        }
+
+        try
+        {
+            // 尝试从 git config 获取凭据
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "git",
+                Arguments = "config --get credential.helper",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                CreateNoWindow = true
+            };
+
+            var process = Process.Start(startInfo);
+            var output = process?.StandardOutput.ReadToEnd()?.Trim();
+            process?.WaitForExit();
+
+            if (output?.Contains("manager") == true)
+            {
+                // 使用 git credential manager 获取凭据
+                startInfo = new ProcessStartInfo
+                {
+                    FileName = "git",
+                    Arguments = $"credential fill",
+                    UseShellExecute = false,
+                    RedirectStandardInput = true,
+                    RedirectStandardOutput = true,
+                    CreateNoWindow = true
+                };
+
+                process = Process.Start(startInfo);
+                if (process != null)
+                {
+                    process.StandardInput.WriteLine($"url={url}");
+                    process.StandardInput.WriteLine();
+                    process.StandardInput.Close();
+
+                    var credentials = process.StandardOutput.ReadToEnd();
+                    process.WaitForExit();
+
+                    var username = credentials.Split('\n')
+                        .FirstOrDefault(l => l.StartsWith("username="))
+                        ?.Replace("username=", "");
+                    var password = credentials.Split('\n')
+                        .FirstOrDefault(l => l.StartsWith("password="))
+                        ?.Replace("password=", "");
+
+                    if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
+                    {
+                        var creds = new UsernamePasswordCredentials
+                        {
+                            Username = username,
+                            Password = password
+                        };
+
+                        // 添加到缓存，成功获取的凭据永不过期
+                        _credentialsCache.TryAdd(cacheKey, new CachedCredentials
+                        {
+                            Credentials = creds,
+                            ExpiresAt = null  // 永不过期
+                        });
+
+                        return creds;
+                    }
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        // 如果出现任何错误，返回默认凭据，并设置过期时间
+        var defaultCreds = new DefaultCredentials();
+        
+        // 缓存默认凭据，30分钟后过期
+        _credentialsCache.TryAdd(cacheKey, new CachedCredentials
+        {
+            Credentials = defaultCreds,
+            ExpiresAt = DateTime.Now.AddMinutes(CREDENTIALS_CACHE_MINUTES)
+        });
+
+        return defaultCreds;
+    }
+
+    private async Task FetchRepository(RepoStatus repo)
+    {
+        if (repo == null) 
+			return;
+
+		try
+        {
+            repo.IsFetching = true;
+            StateHasChanged();
+
+			// 后台运行获取远程状态
+            await Task.Run(async () =>
+            {
+                try
+                {
+                    using var gitRepo = new Repository(repo.Path);
+                    foreach (var remote in gitRepo.Network.Remotes)
+                    {
+                        try
+                        {
+                            var refSpecs = remote.FetchRefSpecs.Select(x => x.Specification).ToList();
+                            var fetchOptions = new FetchOptions 
+                            { 
+                                Prune = false,
+                                TagFetchMode = TagFetchMode.Auto,
+                                CredentialsProvider = GetCredentialsProvider,
+                            };
+
+                            Commands.Fetch(gitRepo, remote.Name, refSpecs, fetchOptions, $"正在从 {remote.Name} 获取更新");
+                        }
+                        catch (Exception ex)
+                        {
+                            await InvokeAsync(() => 
+                                Snackbar.Add($"仓库 {Path.GetFileName(repo.Path)} 从远程 {remote.Name} fetch 时出错: {ex.Message}", Severity.Warning));
+                        }
+                    }
+
+                    await InvokeAsync(() => UpdateRepositoryStatus(repo, gitRepo));
+                }
+                catch (Exception ex)
+                {
+                    await InvokeAsync(() => 
+                        Snackbar.Add($"仓库 {Path.GetFileName(repo.Path)} fetch 时出错: {ex.Message}", Severity.Warning));
+                }
+            });
+        }
+        finally
+        {
+            repo.IsFetching = false;
+            StateHasChanged();
+        }
+    }
+
+    private void UpdateRepositoryStatus(RepoStatus repo, Repository gitRepo)
+    {
+        var status = gitRepo.RetrieveStatus();
+        var branch = gitRepo.Head;
+        var tracking = branch.TrackingDetails;
+
+        repo.Branch = branch.FriendlyName;
+        repo.Branches = gitRepo.Branches
+            .Where(b => !b.IsRemote || settings.ShowRemoteBranches)
+            .Where(b => b.FriendlyName != "HEAD")
+            .Select(b => b.FriendlyName)
+            .ToList();
+
+        repo.LastCommit = new CommitInfo
+        {
+            Sha = branch.Tip.Sha,
+            Message = branch.Tip.Message,
+            Author = branch.Tip.Author.Name,
+            Time = branch.Tip.Author.When
+        };
+
+        repo.ChangesCount = status.Staged.Count() + status.Added.Count() + status.Modified.Count() + status.Removed.Count();
+        repo.AheadCount = tracking?.AheadBy ?? 0;
+        repo.BehindCount = tracking?.BehindBy ?? 0;
     }
 
     protected string GetRelativePath(string fullPath)
@@ -235,7 +398,7 @@ public partial class Workspace : ComponentBase, IDisposable
             errorMessage = $"启动Git客户端时出错: {ex.Message}";
             Snackbar.Add(errorMessage, Severity.Error);
         }
-	}
+    }
 
     protected async Task DoPull(RepoStatus repo)
     {
@@ -286,37 +449,21 @@ public partial class Workspace : ComponentBase, IDisposable
 
         try
         {
-            settings = AppSettings.Load();
-            var resetTypeArg = ((GitResetType)result.Data == GitResetType.Soft) ? "--soft" : "--hard";
-            var resetTarget = "HEAD";
+            using var repository = new Repository(repo.Path);
+            var resetType = (GitResetType)result.Data == GitResetType.Soft ? ResetMode.Soft : ResetMode.Hard;
             
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = settings.GitExecutablePath,
-                Arguments = $"-C \"{repo.Path}\" reset {resetTypeArg} {resetTarget}",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true
-            };
+            // 获取当前分支的最新提交
+            var targetCommit = repository.Head.Tip;
+            
+            // 执行重置
+            repository.Reset(resetType, targetCommit);
 
-            var process = Process.Start(startInfo);
-            var output = await process.StandardOutput.ReadToEndAsync();
-            var error = await process.StandardError.ReadToEndAsync();
-            await process.WaitForExitAsync();
-
-            if (process.ExitCode == 0)
-            {
-                var message = ((GitResetType)result.Data == GitResetType.Soft) ? 
-                    "已软重置，工作区的修改已保留" : 
-                    "已硬重置，所有修改已丢弃";
-                Snackbar.Add(message, Severity.Success);
-                await RefreshWorkspace();
-            }
-            else
-            {
-                Snackbar.Add($"重置失败: {error}", Severity.Error);
-            }
+            var message = resetType == ResetMode.Soft ? 
+                "已软重置，工作区的修改已保留" : 
+                "已硬重置，所有修改已丢弃";
+            
+            Snackbar.Add(message, Severity.Success);
+            await RefreshWorkspace(false);
         }
         catch (Exception ex)
         {
