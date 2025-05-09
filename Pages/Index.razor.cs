@@ -1,3 +1,4 @@
+using ArkSharp;
 using Microsoft.AspNetCore.Components;
 using System;
 using System.IO;
@@ -19,6 +20,21 @@ public partial class Index
             isFirstVisit = false;
 
             var settings = AppSettings.Load();
+
+			// 先检查是否指定启动路径
+			var args = Environment.GetCommandLineArgs();
+			if (args != null && args.Length > 1)
+			{
+				var argPath = args[1];
+
+				if (!string.IsNullOrEmpty(argPath) && Directory.Exists(args[1]))
+				{
+					settings.WorkspacePaths.AddUnique(argPath);
+					settings.LastWorkspacePath = argPath;
+					settings.Save();
+				}
+			}
+
             if (!string.IsNullOrEmpty(settings.LastWorkspacePath) && 
                 Directory.Exists(settings.LastWorkspacePath))
             {
