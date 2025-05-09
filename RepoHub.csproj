@@ -8,11 +8,11 @@
 		<ApplicationIcon>favicon.ico</ApplicationIcon>
 		<RootNamespace>RepoHub</RootNamespace>
 		<AssemblyName>RepoHub</AssemblyName>
-		<DebugType>embedded</DebugType>
 		<PublishRelease>true</PublishRelease>
-		<PublishSingleFile>true</PublishSingleFile>
+		<PublishSingleFile>false</PublishSingleFile>
 		<EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
 		<!--
+		<DebugType>embedded</DebugType>
 		<IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
 		<ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
 		<SelfContained>false</SelfContained>
