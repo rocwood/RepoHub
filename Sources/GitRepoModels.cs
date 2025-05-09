@@ -25,6 +25,6 @@ public class CommitInfo
 
 public enum GitResetType
 {
-	Soft = 1,    // 软重置：保留工作区和暂存区的修改
-	Hard = 2,    // 硬重置：丢弃所有修改，包括工作区和暂存区
+    Soft = 1,    // 软重置：保留工作区和暂存区的修改
+    Hard = 2,    // 硬重置：丢弃所有修改，包括工作区和暂存区
 }

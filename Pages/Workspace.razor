@@ -41,10 +41,10 @@
                     <MudCard Class="mb-1">
                         <MudCardContent>
                             <MudStack Row="true" AlignItems="AlignItems.Center">
-                                <MudText Typo="Typo.body1" Style="width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                <MudText Typo="Typo.body1" Style="width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                                     <b>@GetRelativePath(repo.Path)</b>
                                 </MudText>
-                                <MudStack Style="width: 120px;" Spacing="0">
+                                <MudStack Style="width: 150px;" Spacing="0">
                                     <MudSelect T="string" Value="@repo.Branch" ValueChanged="@(async (string branch) => await SwitchBranch(repo, branch))"
                                          Dense="true" AnchorOrigin="Origin.BottomCenter">
                                         @foreach (var branch in repo.Branches)
@@ -53,15 +53,17 @@
                                         }
                                     </MudSelect>
                                 </MudStack>
-                                <MudStack Class="flex-grow-1 mx-4" Spacing="0">
+                                <MudStack Class="flex-grow-1 mx-4" Spacing="0" Style="max-width: 35%">
                                     <MudText Typo="Typo.body2" Style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                        @repo.LastCommit.Sha.Substring(0, 7)  @repo.LastCommit.Author (@repo.LastCommit.Time.ToLocalTime().ToString("yyyy-MM-dd HH:mm"))
+                                        @repo.LastCommit.Sha.Substring(0, 7) - @repo.LastCommit.Author (@repo.LastCommit.Time.ToLocalTime().ToString("MM-dd HH:mm"))
                                     </MudText>
-                                    <MudText Typo="Typo.body2" Style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                        @repo.LastCommit.Message
-                                    </MudText>
+                                    <MudTooltip Text="@repo.LastCommit.Message" Arrow="true" Placement="Placement.Bottom">
+                                        <MudText Typo="Typo.body2" Style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                            @repo.LastCommit.Message
+                                        </MudText>
+                                    </MudTooltip>
                                 </MudStack>
-                                <MudStack Row="true" Style="min-width: 160px;" Spacing="5" AlignItems="AlignItems.Center" Class="d-flex justify-end">
+                                <MudStack Row="true" Style="min-width: 200px;" Spacing="2" AlignItems="AlignItems.Center" Class="d-flex justify-end">
                                     <MudBadge Content="@repo.ChangesCount" Color="Color.Warning" Overlap="true" Visible="@(repo.ChangesCount > 0)" Origin="Origin.BottomRight">
                                         <MudTooltip Text="提交">
                                                     <MudIconButton Size="Size.Medium"

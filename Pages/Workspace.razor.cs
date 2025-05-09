@@ -11,6 +11,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Timers;
+using ArkSharp;
 
 namespace RepoHub;
 
@@ -44,17 +45,33 @@ public partial class Workspace : ComponentBase, IDisposable
     {
         settings = AppSettings.Load();
 
-        // 如果工作区路径列表为空，添加上次使用的路径
-        if (settings.WorkspacePaths.Count == 0 && !string.IsNullOrEmpty(settings.LastWorkspacePath))
+        // 先检查是否指定启动路径
+        var args = Environment.GetCommandLineArgs();
+        if (args != null && args.Length > 1)
         {
-            settings.WorkspacePaths.Add(settings.LastWorkspacePath);
-            settings.Save();
+            var argPath = args[1];
+
+            if (!string.IsNullOrEmpty(argPath) && Directory.Exists(args[1]))
+            {
+                settings.WorkspacePaths.AddUnique(argPath);
+                settings.LastWorkspacePath = argPath;
+                settings.Save();
+            }
         }
 
-        // 如果列表仍为空，使用当前目录
         if (settings.WorkspacePaths.Count == 0)
         {
-            settings.WorkspacePaths.Add(Environment.CurrentDirectory);
+            if (!string.IsNullOrEmpty(settings.LastWorkspacePath))
+            {
+                // 如果没有有效的启动参数，再尝试使用上次路径
+                settings.WorkspacePaths.Add(settings.LastWorkspacePath);
+            }
+            else
+            {
+                // 如果上次路径也没有，使用当前目录
+                settings.WorkspacePaths.Add(Environment.CurrentDirectory);
+            }
+
             settings.Save();
         }
 
@@ -131,7 +148,9 @@ public partial class Workspace : ComponentBase, IDisposable
             }
 
             await ScanRepositories(workspacePath, fetchRemote);
-            await SaveWorkspacePath(workspacePath);
+
+            settings.LastWorkspacePath = workspacePath;
+            settings.Save();
         }
         catch (Exception ex)
         {
@@ -325,6 +344,7 @@ public partial class Workspace : ComponentBase, IDisposable
         var status = gitRepo.RetrieveStatus();
         var branch = gitRepo.Head;
         var tracking = branch.TrackingDetails;
+        var tip = branch.Tip;
 
         repo.Branch = branch.FriendlyName;
         repo.Branches = gitRepo.Branches
@@ -334,10 +354,10 @@ public partial class Workspace : ComponentBase, IDisposable
             .ToList();
 
         repo.LastCommit = new CommitInfo {
-            Sha = branch.Tip.Sha,
-            Message = branch.Tip.Message,
-            Author = branch.Tip.Author.Name,
-            Time = branch.Tip.Author.When
+            Sha = tip?.Sha ?? "",
+            Message = tip?.Message ?? "",
+            Author = tip?.Author?.Name ?? "",
+            Time = tip?.Author?.When ?? DateTime.UnixEpoch,
         };
 
         repo.ChangesCount = status.Staged.Count() + status.Added.Count() + status.Modified.Count() + status.Removed.Count();
@@ -362,15 +382,12 @@ public partial class Workspace : ComponentBase, IDisposable
 
             if (!string.IsNullOrEmpty(folderPath) && Directory.Exists(folderPath))
             {
-                if (!settings.WorkspacePaths.Contains(folderPath))
-                {
-                    settings.WorkspacePaths.Add(folderPath);
-                    settings.LastWorkspacePath = folderPath;
-                    settings.Save();
+                settings.WorkspacePaths.AddUnique(folderPath);
+                settings.LastWorkspacePath = folderPath;
+                settings.Save();
 
-                    workspacePath = folderPath;
-                    await LoadWorkspace(true);
-                }
+                workspacePath = folderPath;
+                await LoadWorkspace(true);
             }
         }
         catch (Exception ex)
@@ -395,23 +412,23 @@ public partial class Workspace : ComponentBase, IDisposable
             { "ContentText", "确定要从列表中移除此工作区吗？\n这不会删除磁盘上的文件。" },
             { "AdditionalInfo", $"工作区路径：{workspacePath}" },
             { "Color", Color.Warning },
-			{ "Actions", new List<DialogAction>
-				{
-					new()
-					{
-						Text = "移除",
-						Value = 1,
-						Color = Color.Warning,
-						Variant = Variant.Filled
-					},
-				}
-			}
-		};
+            { "Actions", new List<DialogAction>
+                {
+                    new()
+                    {
+                        Text = "移除",
+                        Value = 1,
+                        Color = Color.Warning,
+                        Variant = Variant.Filled
+                    },
+                }
+            }
+        };
 
         var dialog = await DialogService.ShowAsync<MessageBox>("移除确认", parameters, options);
         var result = await dialog.Result;
-		if (result.Canceled)
-			return;
+        if (result.Canceled)
+            return;
 
         settings.WorkspacePaths.Remove(workspacePath);
 
@@ -548,17 +565,6 @@ public partial class Workspace : ComponentBase, IDisposable
             errorMessage = $"执行重置命令时出错: {ex.Message}";
             Snackbar.Add(errorMessage, Severity.Error);
         }
-    }
-
-    protected async Task<string> LoadLastWorkspacePath()
-    {
-        return settings.LastWorkspacePath;
-    }
-
-    protected async Task SaveWorkspacePath(string path)
-    {
-        settings.LastWorkspacePath = path;
-        settings.Save();
     }
 
     protected async Task SwitchBranch(RepoStatus repo, string newBranch)
