@@ -346,7 +346,7 @@ public partial class Workspace : ComponentBase, IDisposable
             Time = tip?.Author?.When ?? DateTime.UnixEpoch,
         };
 
-        repo.ChangesCount = status.Staged.Count() + status.Added.Count() + status.Modified.Count() + status.Removed.Count();
+        repo.ChangesCount = status.Staged.Count() + status.Added.Count() + status.Modified.Count() + status.Removed.Count() + status.Untracked.Count();
         repo.AheadCount = tracking?.AheadBy ?? 0;
         repo.BehindCount = tracking?.BehindBy ?? 0;
     }
@@ -585,7 +585,7 @@ public partial class Workspace : ComponentBase, IDisposable
                 // 更新状态
                 var status = repository.RetrieveStatus();
                 var tracking = branch.TrackingDetails;
-                repo.ChangesCount = status.Added.Count() + status.Modified.Count() + status.Removed.Count();
+                repo.ChangesCount = status.Staged.Count() + status.Added.Count() + status.Modified.Count() + status.Removed.Count() + status.Untracked.Count();
                 repo.AheadCount = tracking?.AheadBy ?? 0;
                 repo.BehindCount = tracking?.BehindBy ?? 0;
 
